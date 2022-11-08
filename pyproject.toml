@@ -1,0 +1,56 @@
+[project]
+dependencies = [
+ "tree_sitter_languages",
+ "typer",
+ "rich",
+ "ipdb",
+]
+classifiers = [
+ "Environment :: Console",
+ "Development Status :: 3 - Alpha",
+ "Intended Audience :: Developers",
+ "Natural Language :: English",
+ "Operating System :: OS Independent",
+ "Programming Language :: Python :: 3 :: Only",
+ "Programming Language :: Python :: 3",
+ "Programming Language :: Python :: 3.10",
+ "Programming Language :: Python :: 3.6",
+ "Programming Language :: Python :: 3.7",
+ "Programming Language :: Python :: 3.8",
+ "Programming Language :: Python :: 3.9",
+ "Programming Language :: Python :: Implementation :: CPython",
+ "Programming Language :: Python :: Implementation :: PyPy",
+ "Programming Language :: Python",
+ "Topic :: Software Development",
+ "Topic :: Text Processing",
+ "Typing :: Typed",
+]
+dynamic = [
+ "version",
+]
+description = "A simple markdown formatter"
+name = "tree-sitter-formatter"
+readme = "README.md"
+requires-python = ">=3.6"
+[[project.authors]]
+name = "Waylon Walker"
+email = "waylon@waylonwalker.com"
+
+[project.license]
+file = "LICENSE"
+
+[project.scripts]
+tree-sitter-formatter = "tree_sitter_formatter.cli:app"
+
+[project.urls]
+Source = "https://github.com/waylonwalker/tree-sitter-formatter"
+
+[tool.hatch.version]
+path = "tree_sitter_formatter/__about__.py"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+ "/.github",
+]
+
+[tool.hatch.build.targets.wheel]
