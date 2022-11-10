@@ -1,3 +1,4 @@
+import shutil
 import sys
 import traceback
 from pathlib import Path
@@ -17,12 +18,25 @@ def format_callback(file):
 app = typer.Typer()
 
 
+def _install_config():
+    default_config = Path(__file__).parent / "default_tree_sitter_formatter.toml"
+    user_config = Path.home() / ".config" / ".tree_sitter_formatter.toml"
+    shutil.copy(default_config, user_config)
+
+
 @app.callback(invoke_without_command=True)
 def main(
-    file: Optional[Path] = typer.Argument(...),
+    ctx: typer.Context,
+    file: Optional[Path] = typer.Argument(None),
     dry_run: bool = typer.Option(False),
     should_pdb: bool = typer.Option(False, "--pdb"),
+    install_config: bool = typer.Option(False, "--install-config"),
 ):
+    if install_config:
+        _install_config()
+
+    if file is None:
+        return
     if should_pdb:
         try:
             run(file, dry_run)
