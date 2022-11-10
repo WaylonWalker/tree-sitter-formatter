@@ -1,0 +1,77 @@
+[tree_sitter_formatter.formatters.python]
+cmd = "black"
+mode = "inplace"
+
+[tree_sitter_formatter.formatters.bash]
+cmd = "/usr/bin/cat"
+mode = "stdout"
+
+[tree_sitter_formatter.formatters.sql]
+cmd = "sqlformat --reindent --keywords upper --identifiers lower -a"
+mode = "stdout"
+
+[tree_sitter_formatter.formatters.yaml]
+cmd = "yq -yi ''"
+mode = "inplace"
+
+[tree_sitter_formatter.formatters.json]
+cmd = "jq ''"
+mode = "stdout"
+
+[tree_sitter_formatter.formatters.javascript]
+cmd = "prettier"
+suffix = ".js"
+mode = "stdout"
+
+[tree_sitter_formatter.queries]
+py = """
+(expression_statement
+ (assignment
+ (identifier) @name (.match? @name ".*_sql$") 
+ (string) @format_sql
+ )
+)
+
+(expression_statement
+ (assignment
+ (identifier) @name (.match? @name ".*_json$") 
+ (string) @format_json
+ )
+)
+"""
+md = """
+(fenced_code_block
+    (info_string) @info (#eq? @info "python")
+    (code_fence_content)
+) @format_python
+
+(fenced_code_block
+    (info_string) @info (#eq? @info "bash")
+    (code_fence_content)
+) @format_bash
+
+(fenced_code_block
+    (info_string) @info (#eq? @info "javascript")
+    (code_fence_content)
+) @format_javascript
+
+(fenced_code_block
+    (info_string) @info (#eq? @info "sql")
+    (code_fence_content)
+) @format_sql
+
+(fenced_code_block
+    (info_string) @info (#eq? @info "yaml")
+    (code_fence_content)
+) @format_yaml
+
+(fenced_code_block
+    (info_string) @info (#eq? @info "json")
+    (code_fence_content)
+) @format_json
+"""
+
+
+[tree_sitter_formatter.languages]
+py='python'
+md='markdown'
