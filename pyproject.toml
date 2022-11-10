@@ -4,6 +4,7 @@ dependencies = [
  "typer",
  "rich",
  "ipdb",
+ "anyconfig",
 ]
 classifiers = [
  "Environment :: Console",

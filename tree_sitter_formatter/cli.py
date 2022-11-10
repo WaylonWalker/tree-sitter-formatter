@@ -2,6 +2,7 @@ import subprocess
 import sys
 import tempfile
 import traceback
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -11,45 +12,38 @@ from rich.style import Style
 from rich.syntax import Syntax
 from tree_sitter_languages import get_language, get_parser
 
-formatters = {
-    "python": {
-        "cmd": "black",
-        "mode": "inplace",
-    },
-    "bash": {
-        "cmd": "/usr/bin/cat",
-        "mode": "stdout",
-    },
-    "sql": {
-        "cmd": "sqlformat --reindent --keywords upper --identifiers lower -a",
-        "mode": "stdout",
-    },
-    "yaml": {
-        "cmd": "yq -yi ''",
-        "mode": "inplace",
-    },
-}
+from tree_sitter_formatter import standard_config
 
 
-def format(formatter: str, mode: str, code: str):
-    file = tempfile.NamedTemporaryFile(prefix="codeformat")
+@dataclass
+class Formatter:
+    cmd: str
+    suffix: str = ""
+    mode: str = "inplace"
+
+
+def format(formatter: "Formatter", code: str):
+    file = tempfile.NamedTemporaryFile(prefix="codeformat", suffix=formatter.suffix)
     file.write(code.encode())
     file.seek(0)
 
-    cmd = ([*formatter.split(), file.name],)
+    cmd = " ".join([*formatter.cmd.split(), file.name])
 
     proc = subprocess.Popen(
-        " ".join([*formatter.split(), file.name]),
+        cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         shell=True,
     )
     if proc.wait() == 0:
-        if mode == "inplace":
+        if formatter.mode == "inplace":
             return Path(file.name).read_text()
-        if mode == "stdout":
+        if formatter.mode == "stdout":
             return proc.stdout.read().decode()
-        # return file.file.read().decode()
+    else:
+        import ipdb
+
+        ipdb.breakpoint()
 
 
 class TreeSitterFormatter:
@@ -57,35 +51,38 @@ class TreeSitterFormatter:
 
         self.console = Console()
         self.file = Path(file)
-        self.content = self.file.read_text()
-        self.language = get_language("markdown")
-        self.parser = get_parser("markdown")
+        self.suffix = self.file.suffix.replace(".", "")
+        self.config = standard_config.load("tree_sitter_formatter")
 
-        # self.query = self.language.query(self.query_str)
-        self.queries = {
-            language: self.make_query(language) for language in formatters.keys()
+        self.content = self.file.read_text()
+        self.language = get_language(self.config["languages"][self.suffix])
+        self.query = self.language.query(self.config["queries"][self.suffix])
+        self.parser = get_parser(self.config["languages"][self.suffix])
+        self.formatters = {
+            name: Formatter(**formatter)
+            for name, formatter in self.config["formatters"].items()
         }
+
+        self.format()
 
     def __rich_repr__(self):
         self.console.print(self.syntax)
 
-    def make_query(self, language):
-
-        return self.language.query(
-            f"""
-        (fenced_code_block
-        (info_string) @info (#eq? @info "{language}")
-        (code_fence_content) @python
-        ) @block
-        """
-        )
-
-    def format_capture(self, capture, language):
+    def get_text_from_capture(self, capture):
         content = self.content.split("\n")
+        capture = capture[0]
+        rows = content[capture.start_point[0] + 1 : capture.end_point[0]]
+        rows[0] = rows[0][capture.start_point[1] :]
+        rows[-1] = rows[-1][capture.end_point[1] :]
+        return "\n".join(rows)
+
+    def format_capture(self, capture):
+        content = self.content.split("\n")
+        formatter = self.formatters.get(capture[1].replace("format_", ""))
+        capture = capture[0]
 
         formatted = format(
-            formatters[language]["cmd"],
-            formatters[language]["mode"],
+            formatter,
             "\n".join(content[capture.start_point[0] + 1 : capture.end_point[0]]),
         )
         formatted = formatted.strip("\n")
@@ -97,23 +94,30 @@ class TreeSitterFormatter:
         self.content = "\n".join(content)
 
     def format(self):
-        for capture in self.captures:
-            if capture[2] in formatters.keys():
-                self.format_capture(capture[0], capture[2])
+        for i in range(len(self.query.captures(self.tree.root_node))):
+            capture = self.query.captures(self.tree.root_node)[i]
+            if capture[1].startswith("format"):
+                self.format_capture(capture)
+
     @property
     def syntax(self):
-        self.format()
 
         syntax = Syntax(self.content, "markdown", line_numbers=True)
         style = Style(bgcolor="deep_pink4")
 
-        for capture in self.captures:
-            if capture[2] in formatters.keys():
-                self.highlight(syntax, capture[0], style, capture[2])
+        for i in range(len(self.query.captures(self.tree.root_node))):
+            capture = self.query.captures(self.tree.root_node)[i]
+            if capture[1].startswith("format"):
+                self.highlight(
+                    syntax,
+                    capture[0],
+                    style,
+                    self.formatters[capture[1].replace("format_", "")],
+                )
 
         return syntax
 
-    def highlight(self, syntax, capture, style, lang):
+    def highlight(self, syntax, capture, style, formatter):
         start = capture.start_point
         start = (start[0] + 1, start[1])
         end = capture.end_point
@@ -123,7 +127,7 @@ class TreeSitterFormatter:
 
         code = syntax.code.split("\n")
         comment_start = (start[0], len(code[start[0] - 1]))
-        code[start[0] - 1] = code[start[0] - 1] + f"       ■ {formatters[lang]}"
+        code[start[0] - 1] = code[start[0] - 1] + f"       ■ {formatter.cmd}"
         comment_end = (start[0], len(code[start[0] - 1]))
         syntax.code = "\n".join(code)
         comment_style = Style(color="deep_pink4", italic=True, bgcolor="grey15")
@@ -133,7 +137,7 @@ class TreeSitterFormatter:
         self.console.print(self.syntax)
 
     def save(self):
-        self.format()
+        # self.format()
         self.file.write_text(self.content)
 
     def add_formatter(self, capture_obj):
@@ -152,14 +156,16 @@ class TreeSitterFormatter:
 
     @property
     def captures(self):
+
+        return self.query.captures(self.tree.root_node)
         node = self.tree.root_node
         captures = []
-        for name, query in self.queries.items():
+        for formatter in self.formatters:
             captures.extend(
                 [
                     capture
-                    for capture in self.queries[name].captures(node)
-                    if capture[1] == "block"
+                    for capture in formatter.query.captures(node)
+                    if capture[1] == "format"
                 ]
             )
 
@@ -188,6 +194,7 @@ def main(
             run(file, dry_run)
         except BaseException:
             import ipdb
+
             extype, value, tb = sys.exc_info()
             traceback.print_exc()
             ipdb.post_mortem(tb)
