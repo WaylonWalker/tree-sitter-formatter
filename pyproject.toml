@@ -49,6 +49,12 @@ Source = "https://github.com/waylonwalker/tree-sitter-formatter"
 [tool.hatch.version]
 path = "tree_sitter_formatter/__about__.py"
 
+[build-system]
+requires = [
+ "hatchling>=1.4.1",
+]
+build-backend = "hatchling.build"
+
 [tool.hatch.build.targets.sdist]
 exclude = [
  "/.github",
