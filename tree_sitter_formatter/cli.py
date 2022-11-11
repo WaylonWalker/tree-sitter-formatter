@@ -27,10 +27,19 @@ def _install_config():
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
-    file: Optional[Path] = typer.Argument(None),
-    dry_run: bool = typer.Option(False),
-    should_pdb: bool = typer.Option(False, "--pdb"),
-    install_config: bool = typer.Option(False, "--install-config"),
+    file: Optional[Path] = typer.Argument(None, help="the file to format"),
+    dry_run: bool = typer.Option(
+        False,
+        help="does not do the formatting, but prints out highlightes regions that would be formatted",
+    ),
+    should_pdb: bool = typer.Option(
+        False, "--pdb/--no-pdb", help="opens a debugger on failure"
+    ),
+    install_config: bool = typer.Option(
+        False,
+        "--install-config",
+        help="installs default config to ~/.config/.tree_sitter_formatter.toml",
+    ),
 ):
     if install_config:
         _install_config()
